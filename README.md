@@ -1,0 +1,224 @@
+# Hyperliquid Wallet Tracker
+
+A modern, real-time wallet tracker dashboard for Hyperliquid perpetuals. Built with Next.js 15, TypeScript, and the [@nktkas/hyperliquid](https://github.com/nktkas/hyperliquid) SDK.
+
+![Dashboard Preview](https://via.placeholder.com/800x400?text=Hyperliquid+Wallet+Tracker)
+
+## Features
+
+- **Multi-wallet tracking** - Track multiple public wallet addresses simultaneously
+- **Real-time polling** - Configurable polling interval (default: 10 seconds)
+- **Account summary** - View account value, unrealized PnL, margin used, withdrawable
+- **Position tracking** - See all open positions with entry/mark price, leverage, PnL
+- **Liquidation monitoring** - Distance to liquidation with color-coded warnings
+- **Change detection** - Toast notifications for new/closed positions and PnL swings
+- **Network toggle** - Switch between mainnet and testnet
+- **Dark mode** - Beautiful dark theme by default
+- **Responsive design** - Works on desktop, tablet, and mobile
+
+## Tech Stack
+
+- [Next.js 15+](https://nextjs.org/) (App Router, React 19)
+- [TypeScript](https://www.typescriptlang.org/) (strict mode)
+- [@nktkas/hyperliquid](https://github.com/nktkas/hyperliquid) SDK
+- [Tailwind CSS v4](https://tailwindcss.com/)
+- [shadcn/ui](https://ui.shadcn.com/) components
+- [Sonner](https://sonner.emilkowal.ski/) for toast notifications
+- [Lucide React](https://lucide.dev/) for icons
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18.18 or later
+- npm, pnpm, yarn, or bun
+
+### Installation
+
+1. **Clone the repository**
+
+```bash
+git clone <your-repo-url>
+cd hyperliquid-wallet-tracker
+```
+
+2. **Install dependencies**
+
+```bash
+npm install
+# or
+pnpm install
+# or
+yarn install
+# or
+bun install
+```
+
+3. **Set up environment variables**
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your configuration:
+
+```env
+# Comma-separated list of wallet addresses to track
+NEXT_PUBLIC_WALLETS=0x1234567890abcdef1234567890abcdef12345678,0xabcdef1234567890abcdef1234567890abcdef12
+
+# Polling interval in milliseconds (default: 10000 = 10 seconds)
+NEXT_PUBLIC_POLL_INTERVAL=10000
+
+# Use testnet instead of mainnet (default: false)
+NEXT_PUBLIC_TESTNET=false
+```
+
+4. **Run the development server**
+
+```bash
+npm run dev
+# or
+pnpm dev
+# or
+yarn dev
+# or
+bun dev
+```
+
+5. **Open your browser**
+
+Navigate to [http://localhost:3000](http://localhost:3000)
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_WALLETS` | Comma-separated wallet addresses | Empty |
+| `NEXT_PUBLIC_POLL_INTERVAL` | Polling interval in ms (min: 5000) | `10000` |
+| `NEXT_PUBLIC_TESTNET` | Use testnet API | `false` |
+
+### Adding Wallets
+
+You can add wallets in two ways:
+
+1. **Via environment variables** - Set `NEXT_PUBLIC_WALLETS` in `.env.local`
+2. **Via UI** - Use the wallet input in the sidebar to add addresses dynamically
+
+## Project Structure
+
+```
+hyperliquid-wallet-tracker/
+├── app/
+│   ├── globals.css        # Global styles + Tailwind
+│   ├── layout.tsx         # Root layout
+│   └── page.tsx           # Dashboard page
+├── components/
+│   ├── dashboard/
+│   │   ├── AccountSkeleton.tsx   # Loading skeleton
+│   │   ├── PositionTable.tsx     # Positions table
+│   │   ├── SummaryCards.tsx      # Account summary cards
+│   │   ├── WalletDashboard.tsx   # Main dashboard component
+│   │   └── WalletSelector.tsx    # Wallet picker
+│   ├── providers/
+│   │   └── ToastProvider.tsx     # Toast notifications
+│   └── ui/                       # shadcn/ui components
+├── hooks/
+│   └── useWalletPolling.ts       # Polling hook with change detection
+├── lib/
+│   ├── hyperliquid.ts            # SDK client + data fetching
+│   ├── types.ts                  # TypeScript type definitions
+│   └── utils.ts                  # Utility functions
+├── .env.example
+├── components.json               # shadcn/ui config
+├── next.config.ts
+├── package.json
+├── tailwind.config.ts
+└── tsconfig.json
+```
+
+## Key Components
+
+### `useWalletPolling` Hook
+
+Custom hook that handles:
+- Periodic data fetching from Hyperliquid API
+- Parallel fetching of multiple wallets
+- Change detection between polls
+- Toast notifications for significant changes
+
+### Data Flow
+
+```
+useWalletPolling
+  ├── fetchWalletsData()
+  │     ├── InfoClient.allMids()        # Get all mid prices
+  │     └── InfoClient.clearinghouseState() # Per wallet
+  ├── processClearinghouseState()        # Transform SDK response
+  ├── detectChanges()                    # Compare with previous state
+  └── notifyChanges()                    # Show toast notifications
+```
+
+## API Reference
+
+This project uses the public Info API endpoints from Hyperliquid:
+
+- `POST /info` with `type: "clearinghouseState"` - Get account summary and positions
+- `POST /info` with `type: "allMids"` - Get current mid prices for all coins
+
+See [@nktkas/hyperliquid documentation](https://nktkas.gitbook.io/hyperliquid/) for more details.
+
+## Liquidation Distance Calculation
+
+The dashboard calculates distance to liquidation as a percentage:
+
+```typescript
+// For LONG positions: ((markPrice - liqPrice) / markPrice) * 100
+// For SHORT positions: ((liqPrice - markPrice) / markPrice) * 100
+```
+
+Color coding:
+- 🔴 Red (danger): < 10%
+- 🟡 Yellow (warning): 10-20%
+- 🟢 Green (safe): > 20%
+
+## Change Detection
+
+The app detects and notifies for:
+- **New positions** - Position opened in a coin
+- **Closed positions** - Position closed
+- **PnL swings** - PnL changed by >5% of margin used (and >$10)
+- **Liquidation warnings** - Distance to liquidation dropped below 10%
+
+## Building for Production
+
+```bash
+npm run build
+npm start
+```
+
+## Type Checking
+
+```bash
+npm run typecheck
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+MIT License - feel free to use this project for any purpose.
+
+## Acknowledgments
+
+- [Hyperliquid](https://hyperliquid.xyz/) - The perpetuals DEX
+- [@nktkas/hyperliquid](https://github.com/nktkas/hyperliquid) - Community TypeScript SDK
+- [shadcn/ui](https://ui.shadcn.com/) - Beautiful UI components
+- [Vercel](https://vercel.com/) - Next.js framework
+
+---
+
+**Note:** This is a read-only tracker. It does not require any private keys or signing capabilities. All data is fetched from public API endpoints.
