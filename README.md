@@ -2,7 +2,7 @@
 
 A modern, real-time wallet tracker dashboard for Hyperliquid perpetuals. Built with Next.js 15, TypeScript, and the [@nktkas/hyperliquid](https://github.com/nktkas/hyperliquid) SDK.
 
-![Dashboard Preview](https://via.placeholder.com/800x400?text=Hyperliquid+Wallet+Tracker)
+![Dashboard Preview](docs/dashboard-preview.png)
 
 ## Features
 
