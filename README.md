@@ -54,24 +54,21 @@ yarn install
 bun install
 ```
 
-3. **Set up environment variables**
+3. **Optional: Set default config in JSON**
 
-```bash
-cp .env.example .env.local
+Edit `data/config.json` if you want initial defaults:
+
+```json
+{
+  "wallets": [],
+  "settings": {
+    "pollInterval": 10000,
+    "isTestnet": false
+  }
+}
 ```
 
-Edit `.env.local` with your configuration:
-
-```env
-# Comma-separated list of wallet addresses to track
-NEXT_PUBLIC_WALLETS=0x1234567890abcdef1234567890abcdef12345678,0xabcdef1234567890abcdef1234567890abcdef12
-
-# Polling interval in milliseconds (default: 10000 = 10 seconds)
-NEXT_PUBLIC_POLL_INTERVAL=10000
-
-# Use testnet instead of mainnet (default: false)
-NEXT_PUBLIC_TESTNET=false
-```
+Runtime changes are persisted automatically to browser `localStorage`.
 
 4. **Run the development server**
 
@@ -91,20 +88,19 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## Configuration
 
-### Environment Variables
+### Configuration Storage
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_WALLETS` | Comma-separated wallet addresses | Empty |
-| `NEXT_PUBLIC_POLL_INTERVAL` | Polling interval in ms (min: 5000) | `10000` |
-| `NEXT_PUBLIC_TESTNET` | Use testnet API | `false` |
+- **Source of truth:** Browser `localStorage`
+- **Default fallback:** `data/config.json`
+- **Import/Export:** JSON file from the sidebar
 
 ### Adding Wallets
 
-You can add wallets in two ways:
+You can manage wallets in three ways:
 
-1. **Via environment variables** - Set `NEXT_PUBLIC_WALLETS` in `.env.local`
-2. **Via UI** - Use the wallet input in the sidebar to add addresses dynamically
+1. **Via UI** - Add/remove wallets from the sidebar
+2. **Import JSON** - Import wallet list from file
+3. **Export JSON** - Export current wallet list for backup/share
 
 ## Project Structure
 
@@ -130,6 +126,8 @@ hyperliquid-wallet-tracker/
 │   ├── hyperliquid.ts            # SDK client + data fetching
 │   ├── types.ts                  # TypeScript type definitions
 │   └── utils.ts                  # Utility functions
+├── data/
+│   └── config.json               # Default config (wallets + settings)
 ├── .env.example
 ├── components.json               # shadcn/ui config
 ├── next.config.ts

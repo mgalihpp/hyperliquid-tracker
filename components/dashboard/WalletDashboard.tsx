@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useWalletPolling } from "@/hooks/useWalletPolling";
 import { WalletSelector } from "./WalletSelector";
 import { SummaryCards, EmptySummaryCards } from "./SummaryCards";
@@ -9,12 +9,11 @@ import { AccountSkeleton } from "./AccountSkeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatAddress } from "@/lib/utils";
 import {
-  parseEnvWallets,
-  getPollInterval,
-  isTestnet as getIsTestnet,
-  formatAddress,
-} from "@/lib/utils";
+  loadConfig,
+  saveConfig,
+} from "@/lib/config";
 import type { AccountSummary, PositionData } from "@/lib/types";
 import {
   RefreshCw,
@@ -29,13 +28,30 @@ import {
 import { cn } from "@/lib/utils";
 
 export function WalletDashboard() {
-  // Initialize state from env
-  const [walletAddresses, setWalletAddresses] = useState<string[]>(() =>
-    parseEnvWallets()
-  );
+  // Initialize state from localStorage config
+  const [walletAddresses, setWalletAddresses] = useState<string[]>([]);
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
-  const [isTestnet, setIsTestnet] = useState(() => getIsTestnet());
-  const pollInterval = useMemo(() => getPollInterval(), []);
+  const [isTestnet, setIsTestnet] = useState(false);
+  const [pollInterval, setPollInterval] = useState(10000);
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+
+  // Load config from localStorage on mount
+  useEffect(() => {
+    const config = loadConfig();
+    setWalletAddresses(config.wallets);
+    setIsTestnet(config.settings.isTestnet);
+    setPollInterval(config.settings.pollInterval);
+    setIsConfigLoaded(true);
+  }, []);
+
+  // Save config whenever wallets or settings change
+  useEffect(() => {
+    if (!isConfigLoaded) return;
+    saveConfig({
+      wallets: walletAddresses,
+      settings: { pollInterval, isTestnet },
+    });
+  }, [walletAddresses, pollInterval, isTestnet, isConfigLoaded]);
 
   // Polling hook
   const { wallets, allMids, isLoading, error, lastPollTime, refresh } =
@@ -43,7 +59,7 @@ export function WalletDashboard() {
       addresses: walletAddresses,
       pollInterval,
       isTestnet,
-      enabled: walletAddresses.length > 0,
+      enabled: isConfigLoaded && walletAddresses.length > 0,
     });
 
   // Handle wallet management
@@ -53,6 +69,19 @@ export function WalletDashboard() {
 
   const handleRemoveWallet = useCallback((address: string) => {
     setWalletAddresses((prev) => prev.filter((w) => w !== address));
+  }, []);
+
+  const handleClearAllWallets = useCallback(() => {
+    setWalletAddresses([]);
+    setSelectedWallet(null);
+  }, []);
+
+  const handleImportWallets = useCallback((importedWallets: string[]) => {
+    setWalletAddresses((prev) => {
+      const combined = [...prev, ...importedWallets];
+      // Remove duplicates
+      return [...new Set(combined)];
+    });
   }, []);
 
   const handleSelectWallet = useCallback((wallet: string | null) => {
@@ -223,6 +252,8 @@ export function WalletDashboard() {
               onSelectWallet={handleSelectWallet}
               onAddWallet={handleAddWallet}
               onRemoveWallet={handleRemoveWallet}
+              onClearAll={handleClearAllWallets}
+              onImportWallets={handleImportWallets}
               isTestnet={isTestnet}
             />
 
@@ -299,7 +330,10 @@ export function WalletDashboard() {
             )}
 
             {/* Loading State */}
-            {walletAddresses.length === 0 ? (
+            {!isConfigLoaded ? (
+              /* Initial loading - waiting for config from localStorage */
+              <AccountSkeleton />
+            ) : walletAddresses.length === 0 ? (
               /* Empty State */
               <Card>
                 <CardContent className="py-12 text-center">
@@ -310,12 +344,12 @@ export function WalletDashboard() {
                     No Wallets Configured
                   </h3>
                   <p className="text-muted-foreground max-w-md mx-auto mb-4">
-                    Add a wallet address using the sidebar or set the
-                    NEXT_PUBLIC_WALLETS environment variable.
+                    Add wallet addresses from the sidebar or import them from a
+                    JSON file.
                   </p>
                   <div className="bg-muted rounded-md p-3 max-w-md mx-auto">
                     <code className="text-sm">
-                      NEXT_PUBLIC_WALLETS=0x1234...,0x5678...
+                      ["0x1234...", "0x5678..."]
                     </code>
                   </div>
                 </CardContent>

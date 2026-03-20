@@ -1,0 +1,7 @@
+{
+  "wallets": [],
+  "settings": {
+    "pollInterval": 10000,
+    "isTestnet": false
+  }
+}
