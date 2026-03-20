@@ -299,9 +299,7 @@ export function WalletDashboard() {
             )}
 
             {/* Loading State */}
-            {isLoading && wallets.length === 0 ? (
-              <AccountSkeleton />
-            ) : walletAddresses.length === 0 ? (
+            {walletAddresses.length === 0 ? (
               /* Empty State */
               <Card>
                 <CardContent className="py-12 text-center">
@@ -322,6 +320,9 @@ export function WalletDashboard() {
                   </div>
                 </CardContent>
               </Card>
+            ) : isLoading && wallets.length === 0 ? (
+              /* Loading State - only show when we have wallets but no data yet */
+              <AccountSkeleton />
             ) : (
               /* Dashboard Content */
               <>
