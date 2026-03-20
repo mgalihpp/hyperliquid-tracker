@@ -102,10 +102,56 @@ You can manage wallets in three ways:
 2. **Import JSON** - Import wallet list from file
 3. **Export JSON** - Export current wallet list for backup/share
 
+## MCP Server
+
+This project now includes an MCP server so AI clients (Cursor, Claude Desktop, Claude Code, etc.) can call Hyperliquid wallet tools directly.
+
+### Run MCP server
+
+```bash
+npm run mcp:start
+```
+
+### Available MCP tools
+
+- `list_tracked_wallets`
+- `add_wallet`
+- `remove_wallet`
+- `clear_wallets`
+- `get_all_mids`
+- `get_account_summary`
+- `get_wallet_positions`
+- `get_multi_wallet_summary`
+
+### Available MCP resources
+
+- `hyperliquid://config`
+- `hyperliquid://status`
+
+### MCP client config
+
+Use `mcp.json` as a reference. Example:
+
+```json
+{
+  "mcpServers": {
+    "hyperliquid-tracker": {
+      "command": "npm",
+      "args": ["run", "mcp:start"],
+      "cwd": "/absolute/path/to/hyperliquid-tracker"
+    }
+  }
+}
+```
+
 ## Project Structure
 
 ```
 hyperliquid-wallet-tracker/
+├── mcp/
+│   ├── server.ts                 # MCP stdio server
+│   └── config-store.ts           # JSON config read/write for MCP
+├── mcp.json                      # MCP client config example
 ├── app/
 │   ├── globals.css        # Global styles + Tailwind
 │   ├── layout.tsx         # Root layout

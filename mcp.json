@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "hyperliquid-tracker": {
+      "command": "npm",
+      "args": ["run", "mcp:start"],
+      "cwd": "."
+    }
+  }
+}
