@@ -144,6 +144,18 @@ Use `mcp.json` as a reference. Example:
 }
 ```
 
+or
+
+```json
+{
+  "mcpServers": {
+    "hyperliquid-tracker": {
+      "command": ["npx", "tsx", "/absolute/path/to/hyperliquid-tracker/mcp/server.ts"],
+    }
+  }
+}
+```
+
 ## Project Structure
 
 ```
