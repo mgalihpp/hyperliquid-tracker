@@ -174,7 +174,6 @@ hyperliquid-wallet-tracker/
 │   └── utils.ts                  # Utility functions
 ├── data/
 │   └── config.json               # Default config (wallets + settings)
-├── .env.example
 ├── components.json               # shadcn/ui config
 ├── next.config.ts
 ├── package.json
