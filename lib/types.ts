@@ -69,6 +69,7 @@ export type AllMids = Record<string, string>;
 // ============================================================
 
 export interface PositionData {
+  wallet: string;
   coin: string;
   side: "LONG" | "SHORT";
   size: number; // Absolute size
@@ -103,35 +104,73 @@ export interface WalletData {
   error?: string;
 }
 
+export interface OpenOrderData {
+  wallet: string;
+  coin: string;
+  side: "BUY" | "SELL";
+  orderType: string;
+  tif: string | null;
+  limitPx: number;
+  size: number;
+  originalSize: number;
+  reduceOnly: boolean;
+  isTrigger: boolean;
+  triggerPx: number | null;
+  timestamp: number;
+  orderId: number;
+}
+
+export interface HistoricalOrderData {
+  wallet: string;
+  coin: string;
+  side: "BUY" | "SELL";
+  status: string;
+  orderType: string;
+  tif: string | null;
+  limitPx: number;
+  size: number;
+  originalSize: number;
+  reduceOnly: boolean;
+  timestamp: number;
+  statusTimestamp: number;
+  orderId: number;
+}
+
+export interface FillData {
+  wallet: string;
+  coin: string;
+  side: "BUY" | "SELL";
+  price: number;
+  size: number;
+  fee: number;
+  feeToken: string;
+  closedPnl: number;
+  timestamp: number;
+  orderId: number;
+}
+
+export interface WalletActivityData {
+  wallet: string;
+  openOrders: OpenOrderData[];
+  historicalOrders: HistoricalOrderData[];
+  fills: FillData[];
+  error?: string;
+}
+
 // ============================================================
 // App State Types
 // ============================================================
-
-export interface TrackerState {
-  wallets: WalletData[];
-  allMids: AllMids;
-  isLoading: boolean;
-  error: string | null;
-  lastPollTime: number | null;
-  isTestnet: boolean;
-}
-
-export interface TrackerConfig {
-  pollInterval: number;
-  isTestnet: boolean;
-  walletAddresses: string[];
-}
 
 // ============================================================
 // Change Detection Types
 // ============================================================
 
 export type PositionChangeType = 
-  | "new"      // New position opened
-  | "closed"   // Position closed
-  | "pnl_up"   // PnL increased significantly (>5%)
-  | "pnl_down" // PnL decreased significantly (>5%)
-  | "liq_warning"; // Approaching liquidation (<10%)
+  | "new"
+  | "closed"
+  | "pnl_up"
+  | "pnl_down"
+  | "liq_warning";
 
 export interface PositionChange {
   type: PositionChangeType;

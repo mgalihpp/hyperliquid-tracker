@@ -5,6 +5,10 @@ import type {
   WalletData,
   PositionData,
   AccountSummary,
+  WalletActivityData,
+  OpenOrderData,
+  HistoricalOrderData,
+  FillData,
 } from "./types";
 import { getSideFromSize, calcLiquidationDistance } from "./utils";
 
@@ -85,6 +89,7 @@ export function processClearinghouseState(
     const liqDistance = calcLiquidationDistance(side, markPx, liquidationPx);
 
     return {
+      wallet: address,
       coin: pos.coin,
       side,
       size,
@@ -136,9 +141,12 @@ export function processClearinghouseState(
  */
 export async function fetchWalletsData(
   addresses: string[],
-  isTestnet: boolean
-): Promise<{ wallets: WalletData[]; allMids: AllMids }> {
+  isTestnet: boolean,
+  includeActivity = true,
+  activityAddresses?: string[]
+): Promise<{ wallets: WalletData[]; walletActivities: WalletActivityData[]; allMids: AllMids }> {
   const client = getInfoClient(isTestnet);
+  const activityAddressSet = new Set(activityAddresses ?? addresses);
 
   // Fetch allMids once (shared across all wallets)
   const allMids = await fetchAllMids(client);
@@ -147,56 +155,104 @@ export async function fetchWalletsData(
   const walletPromises = addresses.map(async (address) => {
     try {
       const state = await fetchClearinghouseState(client, address);
-      return processClearinghouseState(state, allMids, address);
+      const walletData = processClearinghouseState(state, allMids, address);
+
+      let openOrders: OpenOrderData[] = [];
+      let historicalOrders: HistoricalOrderData[] = [];
+      let fills: FillData[] = [];
+
+      if (includeActivity && activityAddressSet.has(address)) {
+        const [openOrdersRaw, historicalOrdersRaw, fillsRaw] = await Promise.all([
+          client.frontendOpenOrders({ user: address }),
+          client.historicalOrders({ user: address }),
+          client.userFills({ user: address, aggregateByTime: true }),
+        ]);
+
+        openOrders = openOrdersRaw.map((order) => ({
+          wallet: address,
+          coin: order.coin,
+          side: order.side === "B" ? "BUY" : "SELL",
+          orderType: order.orderType,
+          tif: order.tif,
+          limitPx: parseFloat(order.limitPx),
+          size: parseFloat(order.sz),
+          originalSize: parseFloat(order.origSz),
+          reduceOnly: order.reduceOnly,
+          isTrigger: order.isTrigger,
+          triggerPx: order.triggerPx ? parseFloat(order.triggerPx) : null,
+          timestamp: order.timestamp,
+          orderId: order.oid,
+        }));
+
+        historicalOrders = historicalOrdersRaw.map((item) => ({
+          wallet: address,
+          coin: item.order.coin,
+          side: item.order.side === "B" ? "BUY" : "SELL",
+          status: item.status,
+          orderType: item.order.orderType,
+          tif: item.order.tif,
+          limitPx: parseFloat(item.order.limitPx),
+          size: parseFloat(item.order.sz),
+          originalSize: parseFloat(item.order.origSz),
+          reduceOnly: item.order.reduceOnly,
+          timestamp: item.order.timestamp,
+          statusTimestamp: item.statusTimestamp,
+          orderId: item.order.oid,
+        }));
+
+        fills = fillsRaw.map((fill) => ({
+          wallet: address,
+          coin: fill.coin,
+          side: fill.side === "B" ? "BUY" : "SELL",
+          price: parseFloat(fill.px),
+          size: parseFloat(fill.sz),
+          fee: parseFloat(fill.fee),
+          feeToken: fill.feeToken,
+          closedPnl: parseFloat(fill.closedPnl),
+          timestamp: fill.time,
+          orderId: fill.oid,
+        }));
+      }
+
+      return {
+        walletData,
+        activity: {
+          wallet: address,
+          openOrders,
+          historicalOrders,
+          fills,
+        },
+      };
     } catch (error) {
       // Return error state for this wallet
       return {
-        address,
-        summary: {
-          accountValue: 0,
-          totalMarginUsed: 0,
-          withdrawable: 0,
-          totalUnrealizedPnl: 0,
-          totalPositionValue: 0,
+        walletData: {
+          address,
+          summary: {
+            accountValue: 0,
+            totalMarginUsed: 0,
+            withdrawable: 0,
+            totalUnrealizedPnl: 0,
+            totalPositionValue: 0,
+          },
+          positions: [],
+          lastUpdated: Date.now(),
+          error: error instanceof Error ? error.message : "Failed to fetch wallet data",
         },
-        positions: [],
-        lastUpdated: Date.now(),
-        error: error instanceof Error ? error.message : "Failed to fetch wallet data",
+        activity: {
+          wallet: address,
+          openOrders: [],
+          historicalOrders: [],
+          fills: [],
+          error: error instanceof Error ? error.message : "Failed to fetch wallet activity",
+        },
       };
     }
   });
 
-  const wallets = await Promise.all(walletPromises);
+  const walletResults = await Promise.all(walletPromises);
+  const wallets = walletResults.map((result) => result.walletData);
+  const walletActivities = walletResults.map((result) => result.activity);
 
-  return { wallets, allMids };
-}
-
-/**
- * Fetch data for a single wallet
- */
-export async function fetchSingleWalletData(
-  address: string,
-  allMids: AllMids,
-  isTestnet: boolean
-): Promise<WalletData> {
-  const client = getInfoClient(isTestnet);
-
-  try {
-    const state = await fetchClearinghouseState(client, address);
-    return processClearinghouseState(state, allMids, address);
-  } catch (error) {
-    return {
-      address,
-      summary: {
-        accountValue: 0,
-        totalMarginUsed: 0,
-        withdrawable: 0,
-        totalUnrealizedPnl: 0,
-        totalPositionValue: 0,
-      },
-      positions: [],
-      lastUpdated: Date.now(),
-      error: error instanceof Error ? error.message : "Failed to fetch wallet data",
-    };
-  }
+  return { wallets, walletActivities, allMids };
 }

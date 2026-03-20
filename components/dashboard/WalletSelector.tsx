@@ -319,10 +319,10 @@ export function WalletSelector({
               <button
                 onClick={() => onSelectWallet(null)}
                 className={cn(
-                  "w-full flex items-center justify-between p-2 rounded-md transition-colors text-left",
+                  "w-full flex items-center justify-between p-2.5 rounded-lg transition-colors text-left",
                   selectedWallet === null
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted"
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "hover:bg-muted border border-transparent"
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -339,28 +339,26 @@ export function WalletSelector({
             {wallets.map((wallet) => (
               <div
                 key={wallet}
+                onClick={() => onSelectWallet(wallet)}
                 className={cn(
-                  "group flex items-center justify-between p-2 rounded-md transition-colors",
+                  "group flex items-center justify-between p-2.5 rounded-lg transition-colors cursor-pointer",
                   selectedWallet === wallet
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted"
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "hover:bg-muted border border-transparent"
                 )}
               >
-                <button
-                  onClick={() => onSelectWallet(wallet)}
-                  className="flex items-center gap-2 flex-1 text-left"
-                >
-                  <div className="h-2 w-2 rounded-full bg-green-500" />
-                  <span className="font-mono text-sm">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                  <span className="font-mono text-sm truncate">
                     {formatAddress(wallet, 6)}
                   </span>
-                </button>
+                </div>
 
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 shrink-0">
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-7 w-7"
+                    className="h-7 w-7 cursor-pointer hover:bg-blue-500/15 hover:text-blue-500"
                     onClick={(e) => {
                       e.stopPropagation();
                       copyAddress(wallet);
@@ -371,7 +369,7 @@ export function WalletSelector({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-7 w-7"
+                    className="h-7 w-7 cursor-pointer hover:bg-green-500/15 hover:text-green-500"
                     onClick={(e) => {
                       e.stopPropagation();
                       openExplorer(wallet);
@@ -382,7 +380,7 @@ export function WalletSelector({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-7 w-7 hover:bg-red-500/20 hover:text-red-500"
+                    className="h-7 w-7 cursor-pointer hover:bg-red-500/15 hover:text-red-500"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRemoveWallet(wallet);
@@ -393,7 +391,7 @@ export function WalletSelector({
                 </div>
 
                 {selectedWallet === wallet && (
-                  <CheckCircle2 className="h-4 w-4 ml-2" />
+                  <CheckCircle2 className="h-4 w-4 ml-2 shrink-0" />
                 )}
               </div>
             ))}

@@ -5,6 +5,7 @@ import { useWalletPolling } from "@/hooks/useWalletPolling";
 import { WalletSelector } from "./WalletSelector";
 import { SummaryCards, EmptySummaryCards } from "./SummaryCards";
 import { PositionTable } from "./PositionTable";
+import { OrderTables } from "./OrderTables";
 import { AccountSkeleton } from "./AccountSkeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,8 @@ export function WalletDashboard() {
   const [isTestnet, setIsTestnet] = useState(false);
   const [pollInterval, setPollInterval] = useState(10000);
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+  const [activeView, setActiveView] = useState<"positions" | "orders">("positions");
+  const shouldFetchActivity = activeView === "orders" && selectedWallet !== null;
 
   // Load config from localStorage on mount
   useEffect(() => {
@@ -54,12 +57,22 @@ export function WalletDashboard() {
   }, [walletAddresses, pollInterval, isTestnet, isConfigLoaded]);
 
   // Polling hook
-  const { wallets, allMids, isLoading, error, lastPollTime, refresh } =
+  const {
+    wallets,
+    walletActivities,
+    allMids,
+    isLoading,
+    error,
+    lastPollTime,
+    refresh,
+  } =
     useWalletPolling({
       addresses: walletAddresses,
       pollInterval,
       isTestnet,
       enabled: isConfigLoaded && walletAddresses.length > 0,
+      includeActivity: shouldFetchActivity,
+      activityAddresses: selectedWallet ? [selectedWallet] : [],
     });
 
   // Handle wallet management
@@ -89,24 +102,41 @@ export function WalletDashboard() {
   }, []);
 
   // Calculate aggregated data based on selection
-  const { displaySummary, displayPositions, displayWalletAddress } =
+  const {
+    displaySummary,
+    displayPositions,
+    displayWalletAddress,
+    displayOpenOrders,
+    displayHistoricalOrders,
+    displayFills,
+    showWalletColumn,
+  } =
     useMemo(() => {
       if (wallets.length === 0) {
         return {
           displaySummary: null,
           displayPositions: [],
           displayWalletAddress: undefined,
+          displayOpenOrders: [],
+          displayHistoricalOrders: [],
+          displayFills: [],
+          showWalletColumn: false,
         };
       }
 
       // If specific wallet selected
       if (selectedWallet) {
         const wallet = wallets.find((w) => w.address === selectedWallet);
+        const walletActivity = walletActivities.find((w) => w.wallet === selectedWallet);
         if (wallet) {
           return {
             displaySummary: wallet.summary,
             displayPositions: wallet.positions,
             displayWalletAddress: wallet.address,
+            displayOpenOrders: walletActivity?.openOrders ?? [],
+            displayHistoricalOrders: walletActivity?.historicalOrders ?? [],
+            displayFills: walletActivity?.fills ?? [],
+            showWalletColumn: false,
           };
         }
       }
@@ -142,8 +172,12 @@ export function WalletDashboard() {
         displaySummary: aggregatedSummary,
         displayPositions: allPositions,
         displayWalletAddress: undefined,
+        displayOpenOrders: walletActivities.flatMap((w) => w.openOrders),
+        displayHistoricalOrders: walletActivities.flatMap((w) => w.historicalOrders),
+        displayFills: walletActivities.flatMap((w) => w.fills),
+        showWalletColumn: walletAddresses.length > 1,
       };
-    }, [wallets, selectedWallet]);
+    }, [wallets, walletActivities, selectedWallet, walletAddresses.length]);
 
   // Format last poll time
   const lastPollTimeFormatted = useMemo(() => {
@@ -378,10 +412,47 @@ export function WalletDashboard() {
                 )}
 
                 {/* Positions Table */}
-                <PositionTable
-                  positions={displayPositions}
-                  walletAddress={displayWalletAddress}
-                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={activeView === "positions" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setActiveView("positions")}
+                  >
+                    Positions
+                  </Button>
+                  <Button
+                    variant={activeView === "orders" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setActiveView("orders")}
+                  >
+                    Orders & Fills
+                  </Button>
+                </div>
+
+                {activeView === "orders" && !selectedWallet && (
+                  <Card className="border-yellow-500/40 bg-yellow-500/10">
+                    <CardContent className="p-3 text-sm text-muted-foreground">
+                      Select a specific wallet to load orders and fills. This avoids API rate
+                      limits (429).
+                    </CardContent>
+                  </Card>
+                )}
+
+                {activeView === "positions" ? (
+                  <PositionTable
+                    positions={displayPositions}
+                    walletAddress={displayWalletAddress}
+                    showWalletColumn={showWalletColumn}
+                    onSelectWallet={handleSelectWallet}
+                  />
+                ) : (
+                  <OrderTables
+                    openOrders={displayOpenOrders}
+                    historicalOrders={displayHistoricalOrders}
+                    fills={displayFills}
+                    showWalletColumn={showWalletColumn}
+                  />
+                )}
               </>
             )}
           </div>

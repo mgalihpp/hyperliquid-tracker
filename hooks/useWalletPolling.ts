@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { toast } from "sonner";
-import type { WalletData, AllMids, PositionChange } from "@/lib/types";
+import { useMemo, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { WalletData, AllMids, WalletActivityData } from "@/lib/types";
 import { fetchWalletsData, resetClient } from "@/lib/hyperliquid";
 
 interface UseWalletPollingOptions {
@@ -10,10 +10,13 @@ interface UseWalletPollingOptions {
   pollInterval: number;
   isTestnet: boolean;
   enabled?: boolean;
+  includeActivity?: boolean;
+  activityAddresses?: string[];
 }
 
 interface UseWalletPollingReturn {
   wallets: WalletData[];
+  walletActivities: WalletActivityData[];
   allMids: AllMids;
   isLoading: boolean;
   error: string | null;
@@ -21,228 +24,92 @@ interface UseWalletPollingReturn {
   refresh: () => Promise<void>;
 }
 
-/**
- * Detect changes between previous and current wallet data
- */
-function detectChanges(
-  prevWallets: WalletData[],
-  currentWallets: WalletData[]
-): PositionChange[] {
-  const changes: PositionChange[] = [];
-
-  for (const currentWallet of currentWallets) {
-    const prevWallet = prevWallets.find((w) => w.address === currentWallet.address);
-    if (!prevWallet) continue;
-
-    const prevPositions = new Map(prevWallet.positions.map((p) => [p.coin, p]));
-    const currentPositions = new Map(currentWallet.positions.map((p) => [p.coin, p]));
-
-    // Check for new positions
-    for (const [coin, position] of currentPositions) {
-      if (!prevPositions.has(coin)) {
-        changes.push({
-          type: "new",
-          wallet: currentWallet.address,
-          coin,
-          side: position.side,
-          message: `New ${position.side} position opened: ${coin}`,
-        });
-      }
-    }
-
-    // Check for closed positions
-    for (const [coin, position] of prevPositions) {
-      if (!currentPositions.has(coin)) {
-        changes.push({
-          type: "closed",
-          wallet: currentWallet.address,
-          coin,
-          side: position.side,
-          message: `Position closed: ${coin}`,
-        });
-      }
-    }
-
-    // Check for significant PnL changes (>5%)
-    for (const [coin, currentPos] of currentPositions) {
-      const prevPos = prevPositions.get(coin);
-      if (!prevPos) continue;
-
-      const pnlChange = currentPos.unrealizedPnl - prevPos.unrealizedPnl;
-      const pnlChangePercent = prevPos.marginUsed > 0 
-        ? Math.abs(pnlChange / prevPos.marginUsed) * 100 
-        : 0;
-
-      if (pnlChangePercent > 5 && Math.abs(pnlChange) > 10) { // >5% and >$10 change
-        changes.push({
-          type: pnlChange > 0 ? "pnl_up" : "pnl_down",
-          wallet: currentWallet.address,
-          coin,
-          previousPnl: prevPos.unrealizedPnl,
-          currentPnl: currentPos.unrealizedPnl,
-          message: `${coin} PnL ${pnlChange > 0 ? "increased" : "decreased"}: $${prevPos.unrealizedPnl.toFixed(2)} → $${currentPos.unrealizedPnl.toFixed(2)}`,
-        });
-      }
-
-      // Check for liquidation warning
-      if (
-        currentPos.liqDistance !== null &&
-        currentPos.liqDistance < 10 &&
-        (prevPos.liqDistance === null || prevPos.liqDistance >= 10)
-      ) {
-        changes.push({
-          type: "liq_warning",
-          wallet: currentWallet.address,
-          coin,
-          liqDistance: currentPos.liqDistance,
-          message: `WARNING: ${coin} is ${currentPos.liqDistance.toFixed(1)}% from liquidation!`,
-        });
-      }
-    }
+function normalizeError(err: unknown): string {
+  if (!(err instanceof Error)) {
+    return "Failed to fetch data";
   }
 
-  return changes;
-}
-
-/**
- * Show toast notifications for position changes
- */
-function notifyChanges(changes: PositionChange[]): void {
-  for (const change of changes) {
-    switch (change.type) {
-      case "new":
-        toast.success(change.message, {
-          description: `Wallet: ${change.wallet.slice(0, 8)}...`,
-          duration: 5000,
-        });
-        break;
-      case "closed":
-        toast.info(change.message, {
-          description: `Wallet: ${change.wallet.slice(0, 8)}...`,
-          duration: 5000,
-        });
-        break;
-      case "pnl_up":
-        toast.success(change.message, {
-          description: `Wallet: ${change.wallet.slice(0, 8)}...`,
-          duration: 4000,
-        });
-        break;
-      case "pnl_down":
-        toast.warning(change.message, {
-          description: `Wallet: ${change.wallet.slice(0, 8)}...`,
-          duration: 4000,
-        });
-        break;
-      case "liq_warning":
-        toast.error(change.message, {
-          description: `Wallet: ${change.wallet.slice(0, 8)}... - Consider reducing position!`,
-          duration: 10000,
-        });
-        break;
-    }
+  const message = err.message || "Failed to fetch data";
+  if (message.includes("429") || message.toLowerCase().includes("too many requests")) {
+    return "429 Too Many Requests - rate limited by Hyperliquid API. Reduce polling or track fewer wallets in orders view.";
   }
+
+  return message;
 }
 
-/**
- * Custom hook for polling wallet data from Hyperliquid
- */
 export function useWalletPolling({
   addresses,
   pollInterval,
   isTestnet,
   enabled = true,
+  includeActivity = false,
+  activityAddresses,
 }: UseWalletPollingOptions): UseWalletPollingReturn {
-  const [wallets, setWallets] = useState<WalletData[]>([]);
-  const [allMids, setAllMids] = useState<AllMids>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastPollTime, setLastPollTime] = useState<number | null>(null);
+  const addressKey = useMemo(() => addresses.join(","), [addresses]);
+  const activityAddressKey = useMemo(
+    () => (activityAddresses ?? []).join(","),
+    [activityAddresses]
+  );
 
-  const prevWalletsRef = useRef<WalletData[]>([]);
-  const prevTestnetRef = useRef<boolean>(isTestnet);
-  const isFirstFetchRef = useRef(true);
+  const effectivePollInterval = includeActivity
+    ? Math.max(pollInterval, 20000)
+    : Math.max(pollInterval, 10000);
 
-  // Reset client when testnet mode changes
-  useEffect(() => {
-    if (prevTestnetRef.current !== isTestnet) {
-      resetClient();
-      prevTestnetRef.current = isTestnet;
-      isFirstFetchRef.current = true;
-    }
-  }, [isTestnet]);
-
-  const fetchData = useCallback(async () => {
-    if (addresses.length === 0) {
-      setWallets([]);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setError(null);
-      const { wallets: newWallets, allMids: newMids } = await fetchWalletsData(
-        addresses,
-        isTestnet
-      );
-
-      // Detect and notify changes (skip first fetch)
-      if (!isFirstFetchRef.current && prevWalletsRef.current.length > 0) {
-        const changes = detectChanges(prevWalletsRef.current, newWallets);
-        if (changes.length > 0) {
-          notifyChanges(changes);
-        }
+  const query = useQuery({
+    queryKey: [
+      "wallet-data",
+      isTestnet,
+      addressKey,
+      includeActivity,
+      activityAddressKey,
+      effectivePollInterval,
+    ],
+    enabled: enabled && addresses.length > 0,
+    staleTime: Math.max(5000, Math.floor(effectivePollInterval / 2)),
+    refetchInterval: (q) => {
+      const errorMessage = (q.state.error as Error | null)?.message ?? "";
+      if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("too many requests")) {
+        return Math.max(effectivePollInterval * 3, 30000);
       }
-
-      prevWalletsRef.current = newWallets;
-      isFirstFetchRef.current = false;
-
-      setWallets(newWallets);
-      setAllMids(newMids);
-      setLastPollTime(Date.now());
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to fetch data";
-      setError(message);
-      toast.error("Failed to fetch wallet data", {
-        description: message,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [addresses, isTestnet]);
-
-  // Initial fetch and polling
-  useEffect(() => {
-    if (!enabled) return;
-
-    // Initial fetch
-    fetchData();
-
-    // Set up polling interval
-    const intervalId = setInterval(fetchData, pollInterval);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [fetchData, pollInterval, enabled]);
-
-  // Reset when addresses change
-  useEffect(() => {
-    isFirstFetchRef.current = true;
-    setIsLoading(true);
-  }, [addresses.join(",")]);
+      return effectivePollInterval;
+    },
+    retry: (failureCount, error) => {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      if (message.includes("429") || message.includes("too many requests")) {
+        return failureCount < 1;
+      }
+      return failureCount < 2;
+    },
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30000),
+    queryFn: async () => {
+      resetClient();
+      return fetchWalletsData(addresses, isTestnet, includeActivity, activityAddresses);
+    },
+  });
 
   const refresh = useCallback(async () => {
-    setIsLoading(true);
-    await fetchData();
-  }, [fetchData]);
+    await query.refetch();
+  }, [query]);
+
+  if (addresses.length === 0) {
+    return {
+      wallets: [],
+      walletActivities: [],
+      allMids: {},
+      isLoading: false,
+      error: null,
+      lastPollTime: null,
+      refresh,
+    };
+  }
 
   return {
-    wallets,
-    allMids,
-    isLoading,
-    error,
-    lastPollTime,
+    wallets: query.data?.wallets ?? [],
+    walletActivities: query.data?.walletActivities ?? [],
+    allMids: query.data?.allMids ?? {},
+    isLoading: query.isLoading || query.isFetching,
+    error: query.error ? normalizeError(query.error) : null,
+    lastPollTime: query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null,
     refresh,
   };
 }
