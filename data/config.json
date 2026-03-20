@@ -1,5 +1,9 @@
 {
-  "wallets": [],
+  "wallets": [
+    "0xa5b0edf6b55128e0ddae8e51ac538c3188401d41",
+    "0x6c8512516ce5669d35113a11ca8b8de322fd84f6",
+    "0x0ddf9bae2af4b874b96d287a5ad42eb47138a902"
+  ],
   "settings": {
     "pollInterval": 10000,
     "isTestnet": false

@@ -9,8 +9,9 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "mcp:dev": "tsx mcp/server.ts",
-    "mcp:start": "tsx mcp/server.ts"
+    "mcp:dev": "cd mcp && npm run dev",
+    "mcp:build": "cd mcp && npm run build",
+    "mcp:publish": "cd mcp && npm publish"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.1",

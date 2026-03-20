@@ -1,0 +1,42 @@
+{
+  "name": "hyperliquid-tracker-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Hyperliquid wallet tracking - query positions, account summaries, and mid prices",
+  "type": "module",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "bin": {
+    "hyperliquid-tracker-mcp": "dist/server.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "npx tsx src/server.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "hyperliquid",
+    "crypto",
+    "wallet-tracker",
+    "perpetuals"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.1",
+    "@nktkas/hyperliquid": "^0.32.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

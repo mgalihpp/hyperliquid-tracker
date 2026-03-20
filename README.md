@@ -15,6 +15,7 @@ A modern, real-time wallet tracker dashboard for Hyperliquid perpetuals. Built w
 - **Network toggle** - Switch between mainnet and testnet
 - **Dark mode** - Beautiful dark theme by default
 - **Responsive design** - Works on desktop, tablet, and mobile
+- **MCP Server** - Available as npm package for AI assistants
 
 ## Tech Stack
 
@@ -46,43 +47,15 @@ cd hyperliquid-wallet-tracker
 
 ```bash
 npm install
-# or
-pnpm install
-# or
-yarn install
-# or
-bun install
 ```
 
-3. **Optional: Set default config in JSON**
-
-Edit `data/config.json` if you want initial defaults:
-
-```json
-{
-  "wallets": [],
-  "settings": {
-    "pollInterval": 10000,
-    "isTestnet": false
-  }
-}
-```
-
-Runtime changes are persisted automatically to browser `localStorage`.
-
-4. **Run the development server**
+3. **Run the development server**
 
 ```bash
 npm run dev
-# or
-pnpm dev
-# or
-yarn dev
-# or
-bun dev
 ```
 
-5. **Open your browser**
+4. **Open your browser**
 
 Navigate to [http://localhost:3000](http://localhost:3000)
 
@@ -104,115 +77,93 @@ You can manage wallets in three ways:
 
 ## MCP Server
 
-This project now includes an MCP server so AI clients (Cursor, Claude Desktop, Claude Code, etc.) can call Hyperliquid wallet tools directly.
+This project includes an MCP server published as [`hyperliquid-tracker-mcp`](https://www.npmjs.com/package/hyperliquid-tracker-mcp) on npm.
 
-### Run MCP server
+### Use via npm (recommended)
 
 ```bash
-npm run mcp:start
+npx hyperliquid-tracker-mcp
+```
+
+### MCP client config
+
+Add to your MCP config (Claude Desktop, Cursor, Windsurf, opencode):
+
+```json
+{
+  "mcpServers": {
+    "hyperliquid-tracker": {
+      "command": "npx",
+      "args": ["hyperliquid-tracker-mcp"]
+    }
+  }
+}
 ```
 
 ### Available MCP tools
 
-- `list_tracked_wallets`
-- `add_wallet`
-- `remove_wallet`
-- `clear_wallets`
-- `get_all_mids`
-- `get_account_summary`
-- `get_wallet_positions`
-- `get_multi_wallet_summary`
+| Tool | Description |
+|------|-------------|
+| `list_tracked_wallets` | List configured wallet addresses |
+| `add_wallet` | Add a wallet address to track |
+| `remove_wallet` | Remove a wallet address |
+| `clear_wallets` | Clear all tracked wallets |
+| `get_all_mids` | Get mid prices for all perp coins |
+| `get_account_summary` | Get account summary for a wallet |
+| `get_wallet_positions` | Get detailed positions for a wallet |
+| `get_multi_wallet_summary` | Aggregate summary across multiple wallets |
 
-### Available MCP resources
+### MCP package source
 
-- `hyperliquid://config`
-- `hyperliquid://status`
+The MCP server source lives in [`mcp/`](./mcp/) and can be developed locally:
 
-### MCP client config
-
-Use `mcp.json` as a reference. Example:
-
-```json
-{
-  "mcpServers": {
-    "hyperliquid-tracker": {
-      "command": "npm",
-      "args": ["run", "mcp:start"],
-      "cwd": "/absolute/path/to/hyperliquid-tracker"
-    }
-  }
-}
+```bash
+cd mcp
+npm install
+npm run dev
 ```
 
-or
-
-```json
-{
-  "mcpServers": {
-    "hyperliquid-tracker": {
-      "command": ["npx", "tsx", "/absolute/path/to/hyperliquid-tracker/mcp/server.ts"],
-    }
-  }
-}
-```
+See [`mcp/README.md`](./mcp/README.md) for full MCP package documentation.
 
 ## Project Structure
 
 ```
 hyperliquid-wallet-tracker/
-├── mcp/
-│   ├── server.ts                 # MCP stdio server
-│   └── config-store.ts           # JSON config read/write for MCP
-├── mcp.json                      # MCP client config example
+├── mcp/                           # MCP server (npm package)
+│   ├── src/
+│   │   ├── server.ts              # MCP stdio server
+│   │   ├── hyperliquid.ts         # Hyperliquid API client
+│   │   ├── config-store.ts        # JSON config read/write
+│   │   ├── types.ts               # TypeScript types
+│   │   └── utils.ts               # Utility functions
+│   ├── package.json               # npm package config
+│   ├── tsconfig.json
+│   └── README.md
 ├── app/
-│   ├── globals.css        # Global styles + Tailwind
-│   ├── layout.tsx         # Root layout
-│   └── page.tsx           # Dashboard page
+│   ├── globals.css                # Global styles + Tailwind
+│   ├── layout.tsx                 # Root layout
+│   └── page.tsx                   # Dashboard page
 ├── components/
 │   ├── dashboard/
-│   │   ├── AccountSkeleton.tsx   # Loading skeleton
-│   │   ├── PositionTable.tsx     # Positions table
-│   │   ├── SummaryCards.tsx      # Account summary cards
-│   │   ├── WalletDashboard.tsx   # Main dashboard component
-│   │   └── WalletSelector.tsx    # Wallet picker
+│   │   ├── AccountSkeleton.tsx
+│   │   ├── PositionTable.tsx
+│   │   ├── SummaryCards.tsx
+│   │   ├── WalletDashboard.tsx
+│   │   └── WalletSelector.tsx
 │   ├── providers/
-│   │   └── ToastProvider.tsx     # Toast notifications
-│   └── ui/                       # shadcn/ui components
+│   │   └── ToastProvider.tsx
+│   └── ui/                        # shadcn/ui components
 ├── hooks/
-│   └── useWalletPolling.ts       # Polling hook with change detection
+│   └── useWalletPolling.ts        # Polling hook with change detection
 ├── lib/
-│   ├── hyperliquid.ts            # SDK client + data fetching
-│   ├── types.ts                  # TypeScript type definitions
-│   └── utils.ts                  # Utility functions
+│   ├── hyperliquid.ts             # SDK client + data fetching
+│   ├── types.ts                   # TypeScript type definitions
+│   └── utils.ts                   # Utility functions
 ├── data/
-│   └── config.json               # Default config (wallets + settings)
-├── components.json               # shadcn/ui config
-├── next.config.ts
+│   └── config.json                # Default config
+├── mcp.json                       # MCP client config example
 ├── package.json
-├── tailwind.config.ts
 └── tsconfig.json
-```
-
-## Key Components
-
-### `useWalletPolling` Hook
-
-Custom hook that handles:
-- Periodic data fetching from Hyperliquid API
-- Parallel fetching of multiple wallets
-- Change detection between polls
-- Toast notifications for significant changes
-
-### Data Flow
-
-```
-useWalletPolling
-  ├── fetchWalletsData()
-  │     ├── InfoClient.allMids()        # Get all mid prices
-  │     └── InfoClient.clearinghouseState() # Per wallet
-  ├── processClearinghouseState()        # Transform SDK response
-  ├── detectChanges()                    # Compare with previous state
-  └── notifyChanges()                    # Show toast notifications
 ```
 
 ## API Reference
@@ -223,28 +174,6 @@ This project uses the public Info API endpoints from Hyperliquid:
 - `POST /info` with `type: "allMids"` - Get current mid prices for all coins
 
 See [@nktkas/hyperliquid documentation](https://nktkas.gitbook.io/hyperliquid/) for more details.
-
-## Liquidation Distance Calculation
-
-The dashboard calculates distance to liquidation as a percentage:
-
-```typescript
-// For LONG positions: ((markPrice - liqPrice) / markPrice) * 100
-// For SHORT positions: ((liqPrice - markPrice) / markPrice) * 100
-```
-
-Color coding:
-- 🔴 Red (danger): < 10%
-- 🟡 Yellow (warning): 10-20%
-- 🟢 Green (safe): > 20%
-
-## Change Detection
-
-The app detects and notifies for:
-- **New positions** - Position opened in a coin
-- **Closed positions** - Position closed
-- **PnL swings** - PnL changed by >5% of margin used (and >$10)
-- **Liquidation warnings** - Distance to liquidation dropped below 10%
 
 ## Building for Production
 
